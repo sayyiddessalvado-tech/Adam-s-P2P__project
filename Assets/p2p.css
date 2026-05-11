@@ -1,0 +1,34 @@
+/* assets/p2p.css */
+
+/* Custom Smooth Transitions for Modals */
+.backdrop-blur-sm {
+    backdrop-filter: blur(4px);
+}
+
+/* Custom Scrollbar for a premium FinTech feel */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #2563eb;
+    border-radius: 10px;
+}
+
+/* Tab Active States */
+.auth-tab-active {
+    color: #2563eb;
+    border-bottom: 2px solid #2563eb;
+    font-weight: 700;
+}
+
+/* Hero Text Gradient (Optional flair for your project defense) */
+.text-gradient {
+    background: linear-gradient(to right, #2563eb, #7c3aed);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
