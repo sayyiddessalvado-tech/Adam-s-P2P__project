@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EduLend | Peer-to-Peer Student Micro-Finance</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Force Apache to treat it as executable JavaScript -->
+    <script type="text/javascript" src="./assets/js/tailwind.js"></script>
     <link rel="stylesheet" href="assets/p2p.css">
 </head>
 
@@ -170,12 +171,12 @@
                 <input type="hidden" name="action" value="login">
                 <div>
                     <label class="block text-sm font-semibold text-gray-700">Email Address</label>
-                    <input type="email" name="email" required placeholder="name@school.edu"
+                    <input type="email" name="email" id="emailInput" required placeholder="name@school.edu"
                         class="w-full mt-1.5 p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 transition">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-gray-700">Password</label>
-                    <input type="password" name="password" required placeholder="••••••••"
+                    <input type="password" id="passwordInput" name="password" required placeholder="••••••••"
                         class="w-full mt-1.5 p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 transition">
                 </div>
                 <button type="submit"

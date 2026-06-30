@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        // INSTANT SECURITY CHECK: Run this before any HTML or CSS renders
+        const session = localStorage.getItem("edulend_session");
+        if (!session) {
+            alert("Access Denied: Administrative privileges required.");
+            window.location.href = "p2p.html"; // Immediate boot back to login
+        } else {
+            const user = JSON.parse(session);
+            if (user.role !== "admin") {
+                alert("Access Denied: Administrative privileges required.");
+                window.location.h
+                ref = "p2p.html";
+            }
+        }
+    </script>
+    <title>EduLend Admin Portal - Security & Governance</title>
+    <script src="assets/js/tailwind.js">
+    </script>
+    <link rel="stylesheet" href="assets/p2p.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body class="bg-gray-100 font-sans min-h-screen flex">
+
+    <aside class="w-64 bg-slate-900 text-white flex flex-col justify-between hidden md:flex">
+        <div>
+            <div class="p-6 border-b border-slate-800 flex items-center gap-3">
+                <i class="fa-solid fa-gradient-group text-emerald-400 text-2xl"></i>
+                <span class="text-xl font-bold tracking-wider text-emerald-400">EduLend Portal</span>
+            </div>
+
+            <nav class="mt-6 px-4 space-y-2">
+                <a href="#"
+                    class="flex items-center gap-3 px-4 py-3 bg-emerald-600 rounded-lg text-white font-medium transition">
+                    <i class="fa-solid fa-chart-pie w-5"></i> Dashboard Overview
+                </a>
+                <a href="#"
+                    class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition">
+                    <i class="fa-solid fa-user-check w-5"></i> Milestone Approvals
+                </a>
+                <a href="#"
+                    class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition">
+                    <i class="fa-solid fa-hand-holding-dollar w-5"></i> Escrow & Liquidity
+                </a>
+                <a href="#"
+                    class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition">
+                    <i class="fa-solid fa-shield-alert w-5"></i> Risk Management
+                </a>
+            </nav>
+        </div>
+
+        <div class="p-4 border-t border-slate-800">
+            <div class="flex items-center gap-3 mb-3">
+                <div
+                    class="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center font-bold text-slate-900">
+                    AD
+                </div>
+                <div>
+                    <p class="text-sm font-semibold">System Administrator</p>
+                    <span class="text-xs text-emerald-400 font-mono">Root Access</span>
+                </div>
+            </div>
+            <button onclick="localStorage.removeItem('edulend_session'); window.location.href='p2p.html';"
+                class="w-full text-left flex items-center gap-3 px-4 py-2 text-rose-400 hover:bg-slate-800 rounded-lg transition text-sm">
+                <i class="fa-solid fa-right-from-bracket"></i> Clear Session / Exit
+            </button>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+
+        <header class="bg-white shadow-sm border-b border-gray-200 px-8 py-4 flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">Fintech Risk & Governance Controls</h1>
+                <p class="text-sm text-gray-500">Role Roleplay Phase</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <span
+                    class="bg-amber-100 text-amber-800 text-xs px-3 py-1 rounded-full font-semibold border border-amber-200">
+                    <i class="fa-solid fa-circle-nodes mr-1"></i> Supervisor Mode Active
+                </span>
+                <span class="text-sm text-gray-600 font-medium font-mono" id="current-date">May 2026</span>
+            </div>
+        </header>
+
+        <div class="p-8 space-y-8">
+            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
+                <div
+                    class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between min-w-0">
+                    <div class="min-w-0 flex-1 pr-2">
+                        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">Total Pool
+                            Liquidity</p>
+                        <h3 class="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 mt-1 break-all tracking-tight"
+                            id="total-liquidity">₦0.00</h3>
+                    </div>
+                    <div
+                        class="w-12 h-12 rounded-full bg-emerald-50 flex-shrink-0 flex items-center justify-center text-emerald-600 text-xl">
+                        <i class="fa-solid fa-wallet"></i>
+                    </div>
+                </div>
+
+                <div
+                    class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between min-w-0">
+                    <div class="min-w-0 flex-1 pr-2">
+                        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">Active
+                            Micro-Loans</p>
+                        <h3 class="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 mt-1 break-all tracking-tight"
+                            id="active-loans">₦0.00</h3>
+                    </div>
+                    <div
+                        class="w-12 h-12 rounded-full bg-indigo-50 flex-shrink-0 flex items-center justify-center text-indigo-600 text-xl">
+                        <i class="fa-solid fa-money-bill-trend-up"></i>
+                    </div>
+                </div>
+
+                <div
+                    class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between min-w-0">
+                    <div class="min-w-0 flex-1 pr-2">
+                        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">Defaulter Rate
+                            Threshold</p>
+                        <h3 class="text-lg sm:text-xl lg:text-2xl font-bold text-rose-600 mt-1 break-all tracking-tight"
+                            id="default-rate">0.0%</h3>
+                    </div>
+                    <div
+                        class="w-12 h-12 rounded-full bg-rose-50 flex-shrink-0 flex items-center justify-center text-rose-600 text-xl">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                </div>
+
+                <div
+                    class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between min-w-0">
+                    <div class="min-w-0 flex-1 pr-2">
+                        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">Pending
+                            Verifications</p>
+                        <h3 class="text-lg sm:text-xl lg:text-2xl font-bold text-amber-600 mt-1 break-all tracking-tight"
+                            id="pending-count">0</h3>
+                    </div>
+                    <div
+                        class="w-12 h-12 rounded-full bg-amber-50 flex-shrink-0 flex items-center justify-center text-amber-600 text-xl">
+                        <i class="fa-solid fa-user-clock"></i>
+                    </div>
+                </div>
+
+            </section>
+
+            <section class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-800">Academic Milestone Verification Queue</h2>
+                        <p class="text-xs text-gray-500">Manual proof auditing system for student tier advancement
+                            algorithms.</p>
+                    </div>
+                    <span class="text-xs bg-indigo-100 text-indigo-800 px-3 py-1 rounded font-mono font-bold">Needs
+                        Manual Sign-off</span>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr
+                                class="bg-gray-100 border-b border-gray-200 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                                <th class="p-4">Student ID</th>
+                                <th class="p-4">Full Name</th>
+                                <th class="p-4">Submitted Milestone Detail</th>
+                                <th class="p-4">Target Borrowing Limit</th>
+                                <th class="p-4">Attachment Docs</th>
+                                <th class="p-4">Actions Override</th>
+                            </tr>
+                        </thead>
+                        <tbody id="verification-queue" class="divide-y divide-gray-100">
+                            <tr>
+                                <td colspan="6" class="p-8 text-center text-gray-400 italic font-mono">
+                                    <i class="fa-solid fa-spinner animate-spin mr-2"></i> Initializing verified state
+                                    from engine...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="bg-slate-900 rounded-xl shadow-lg border border-slate-950 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-bold tracking-wider text-emerald-400 uppercase font-mono">
+                        <i class="fa-solid fa-terminal mr-2"></i> Core Node Infrastructure Audit Logs
+                    </h3>
+                    <div class="flex gap-2">
+                        <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                        <span class="w-3 h-3 rounded-full bg-yellow-500"></span>
+                        <span class="w-3 h-3 rounded-full bg-green-500"></span>
+                    </div>
+                </div>
+                <div id="system-logs"
+                    class="bg-slate-950 p-4 rounded-lg h-36 overflow-y-auto border border-slate-800 space-y-1">
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <script src="assets/js/admin_dashboard.js"></script>
+</body>
+
+</html>
