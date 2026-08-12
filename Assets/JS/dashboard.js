@@ -1,28 +1,47 @@
-/**
+ /**
  * EduLend - Dashboard Interactive Controller
- * This script handles dashboard UI transitions, modal control, 
- * and dynamic rendering of the credit score gauge.
+ * Handles user micro-credit request interactions and credit score gauge animations.
  */
 
 document.addEventListener("DOMContentLoaded", () => {
-    // 1. Initialize Dashboard Components
-    animateCreditScore(80); // Defaulting score to 80% on load
+    setupLoanRequests();
 });
 
 /**
- * Toggles the visibility of specified modals
- * @param {string} modalId - The HTML ID of the target modal
+ * Handles requesting micro-credits dynamically through the system backend
  */
-function toggleModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.toggle("hidden");
+function setupLoanRequests() {
+    // Looks for the loan requesting trigger card on the student dashboard
+    const requestLoanCard = document.querySelector('div[class*="hover:border-blue-600"]');
+
+    if (requestLoanCard) {
+        requestLoanCard.addEventListener("click", () => {
+            const amount = parseFloat(prompt("Enter the micro-credit amount you need (₦):"));
+            if (isNaN(amount) || amount <= 0) return alert("Invalid amount entered.");
+
+            fetch('api/request_loan.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount: amount })
+            })
+            .then(res => res.json())
+            .then(data => {
+                alert(data.message);
+                if (data.success) {
+                    window.location.reload(); // Refresh screen to show the new live balance and debt
+                }
+            })
+            .catch(err => {
+                console.error("Loan System API Error:", err);
+                alert("Could not process request. Ensure backend API node is reachable.");
+            });
+        });
     }
 }
 
 /**
- * Animates the circular SVG credit score gauge based on a percentage (0-100)
- * @param {number} score - The credit rating score to render
+ * Animates the circular SVG credit score gauge based on real database scores
+ * @param {number} score - The credit rating score to render (0 - 100)
  */
 function animateCreditScore(score) {
     const circle = document.getElementById("scoreCircle");
@@ -34,36 +53,28 @@ function animateCreditScore(score) {
     // SVG Circle Radius is 70. Circumference = 2 * PI * r = ~440
     const circumference = 2 * Math.PI * 70; 
     
-    // Calculate the offset to leave blank (for the visual countdown progress)
+    // Calculate how much stroke to leave empty (visual countdown indicator)
     const offset = circumference - (score / 100) * circumference;
     
-    // Apply calculation to the SVG stroke-dashoffset properties
+    // Apply calculations smoothly to SVG properties
     circle.style.strokeDasharray = `${circumference}`;
     circle.style.strokeDashoffset = offset;
     
-    // Update text labels
+    // Update score percentage indicator label
     scoreText.innerText = `${score}%`;
 
-    // Dynamic color coding & status labels based on score boundaries
+    // Dynamic color coding & state evaluation
     if (score >= 75) {
         scoreStatus.innerText = "EXCELLENT";
         scoreStatus.className = "text-xs font-black text-emerald-500";
-        circle.className = "text-emerald-500 transition-all duration-1000 ease-out";
+        circle.setAttribute("class", "text-emerald-500 transition-all duration-1000 ease-out");
     } else if (score >= 50) {
         scoreStatus.innerText = "FAIR";
         scoreStatus.className = "text-xs font-black text-amber-500";
-        circle.className = "text-amber-500 transition-all duration-1000 ease-out";
+        circle.setAttribute("class", "text-amber-500 transition-all duration-1000 ease-out");
     } else {
         scoreStatus.innerText = "CRITICAL RISK";
         scoreStatus.className = "text-xs font-black text-red-500";
-        circle.className = "text-red-500 transition-all duration-1000 ease-out";
+        circle.setAttribute("class", "text-red-500 transition-all duration-1000 ease-out");
     }
-}
-
-/**
- * Clears local session cache and redirects user to landing page
- */
-function logout() {
-    // For now, simple redirect. Later, this will trigger a PHP logout script to clear $_SESSION.
-    window.location.href = "index.html";
 }

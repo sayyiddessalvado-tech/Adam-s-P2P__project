@@ -1,47 +1,14 @@
 /**
-* EduLend - Wallet Transaction Logic
-* Handles user balances, system deposits, withdrawals, and debt auto-recovery.
-*/
-
-// Global wallet state initialized from LocalStorage (or defaults)
-let userWallet = JSON.parse(localStorage.getItem("edulend_wallet")) || {
-    balance: 5000.00,       // Current available balance in Naira
-    debt: 0.00,             // Outstanding unpaid loans
-    isDefaulted: false      // System lock status
-};
+ * EduLend - Wallet Transaction Controller
+ * Routes deposits and withdrawals directly to backend processing modules.
+ */
 
 document.addEventListener("DOMContentLoaded", () => {
-    updateWalletUI();
     setupWalletActions();
 });
 
 /**
- * Updates all wallet metrics across the dashboard interface
- */
-function updateWalletUI() {
-    localStorage.setItem("edulend_wallet", JSON.stringify(userWallet));
-
-    if (document.getElementById("wallet-balance")) {
-        document.getElementById("wallet-balance").innerText = `₦${userWallet.balance.toLocaleString()}`;
-    }
-    if (document.getElementById("wallet-debt")) {
-        document.getElementById("wallet-debt").innerText = `₦${userWallet.debt.toLocaleString()}`;
-    }
-
-    // Visual warning banner if user is locked
-    const warningBanner = document.getElementById("wallet-status-banner");
-    if (warningBanner) {
-        if (userWallet.isDefaulted) {
-            warningBanner.classList.remove("hidden");
-            warningBanner.innerText = "⚠️ ACCOUNT LOCKED: Deposits will automatically go toward clearing your unpaid debt balance.";
-        } else {
-            warningBanner.classList.add("hidden");
-        }
-    }
-}
-
-/**
- * Binds the click handlers to the deposit and withdrawal forms/buttons
+ * Binds click events to payment gateway simulators on the UI
  */
 function setupWalletActions() {
     const depositBtn = document.getElementById("btn-deposit");
@@ -52,54 +19,58 @@ function setupWalletActions() {
             const amount = parseFloat(prompt("Enter amount to deposit (₦):"));
             if (isNaN(amount) || amount <= 0) return alert("Invalid amount entered.");
 
-            handleDeposit(amount);
+            executeTransaction('deposit', amount);
         });
     }
 
     if (withdrawBtn) {
         withdrawBtn.addEventListener("click", () => {
-            // Guard clause: Prevent defaulted users from drawing platform capital
-            if (userWallet.isDefaulted) {
-                alert("Action Blocked: You cannot withdraw funds while your account is in default.");
-                return;
-            }
-
-            const amount = parseFloat(prompt("Enter amount to withdraw to your bank account (₦):"));
+            const amount = parseFloat(prompt("Enter amount to withdraw (₦):"));
             if (isNaN(amount) || amount <= 0) return alert("Invalid amount entered.");
-            if (amount > userWallet.balance) return alert("Insufficient funds available.");
 
-            userWallet.balance -= amount;
-            alert(`Withdrawal of ₦${amount.toLocaleString()} processed successfully to your registered bank account.`);
-            updateWalletUI();
+            // We use 'withdrawal' here to match exactly what your PHP $_POST expects
+            executeTransaction('withdrawal', amount);
         });
     }
 }
 
 /**
- * Core business logic engine for incoming wallet capital
+ * Sends transaction events to your live PHP backend
+ * @param {string} actionType - 'deposit' or 'withdrawal'
+ * @param {number} actionAmount - Value to transaction
  */
-function handleDeposit(amount) {
-    alert(`Simulating secure payment gateway payment of ₦${amount.toLocaleString()}...`);
-
-    // Rule: If they are defaulted, the money pays down debt first!
-    if (userWallet.isDefaulted && userWallet.debt > 0) {
-        if (amount >= userWallet.debt) {
-            // Deposit completely covers debt
-            const remainder = amount - userWallet.debt;
-            alert(`Success! ₦${userWallet.debt.toLocaleString()} went to pay off your debt. Your account is now ACTIVE.`);
-            userWallet.debt = 0;
-            userWallet.isDefaulted = false;
-            userWallet.balance += remainder;
-        } else {
-            // Deposit partially covers debt
-            userWallet.debt -= amount;
-            alert(`Partial payment successful. ₦${amount.toLocaleString()} paid toward debt. Remaining debt: ₦${userWallet.debt.toLocaleString()}`);
-        }
-    } else {
-        // Standard user behavior
-        userWallet.balance += amount;
-        alert(`₦${amount.toLocaleString()} successfully credited to your main wallet balance.`);
+function executeTransaction(actionType, actionAmount) {
+    if (actionType === 'deposit') {
+        alert(`Simulating payment gateway connection. Processing ₦${actionAmount.toLocaleString()}...`);
     }
 
-    updateWalletUI();
-}
+    // Use URLSearchParams to simulate a standard HTML form submit so $_POST works in PHP
+    const formData = new URLSearchParams();
+    formData.append('amount', actionAmount);
+    formData.append('type', actionType);
+
+    fetch('Api/process_transaction.php', {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/x-www-form-urlencoded' 
+        },
+        body: formData.toString()
+    })
+    .then(res => {
+        if (!res.ok) {
+            throw new Error(`HTTP Error Status: ${res.status}`);
+        }
+        return res.json();
+    })
+    .then(data => {
+        alert(data.message);
+        if (data.success) {
+            // Instant reload to let PHP pull your newly updated wallet rows & transactions
+            window.location.reload(); 
+        }
+    })
+    .catch(err => {
+        console.error("Transaction System Connection Fault:", err);
+        alert("Transaction processing failed. Please check your database connection.");
+    });
+} 

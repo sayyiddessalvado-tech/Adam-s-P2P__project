@@ -1,117 +1,320 @@
 /**
-* EduLend - Admin Dashboard Logic (Fixed & Aligned)
-* Handles milestone verification using real school documents.
+* EduLend - Admin Dashboard Integration Logic
+* Bridges frontend administration displays with our dynamic MySQL database engines.
 */
 
-// Move this outside the function so we can remove students dynamically when clicked!
-let pendingStudents = [
-    { id: "STU042", name: "Sayyid Adam", milestone: "Official Admission Letter", requestedTier: "Tier 1 Access", document: "admission_letter.pdf" },
-    { id: "STU109", name: "Des Salvador", milestone: "Course Registration Form (Sem 1)", requestedTier: "Tier 2 Access", document: "course_form_signed.png" }
-];
+// Initialize all administrative monitoring modules once loaded
+document.addEventListener("DOMContentLoaded", () => {
+    checkAdminAuth();
+    fetchLiveAdminMetrics();
+    fetchLiveVerificationQueue();
+    fetchRecentLoans();
+    fetchRecentTransactions();
+    fetchHighRiskBorrowers();
+    renderSystemLogs();
+});
 
-// REMOVED THE DOMContentLoaded WRAPPER SO IT RUNS IMMEDIATELY AT THE BOTTOM OF YOUR HTML
-checkAdminAuth();
-renderMetrics();
-renderVerificationQueue();
-renderSystemLogs();
-
-
+// 1. Session Protection Gateway Checks
 function checkAdminAuth() {
-    // 1. Look for the passport card saved by p2p.html
-    const currentUser = JSON.parse(localStorage.getItem("edulend_session"));
-
-    // 2. If no card exists, or if the card role is NOT 'admin', deny access instantly!
-    if (!currentUser || currentUser.role !== "admin") {
+    const sessionToken = localStorage.getItem("edulend_session");
+    if (!sessionToken) {
         alert("Access Denied: Administrative privileges required.");
-        window.location.href = "p2p.html"; // Boot them back to login page
-    }
-
-    // If it reaches here, the user is a valid admin, and the dashboard loads smoothly!
-    console.log("Authentication successful. Welcome, Admin.");
-}
-
-
-
-function renderMetrics() {
-    const metrics = {
-        totalLiquidity: "₦4,500,000.00",
-        activeLoans: "₦1,250,000.00",
-        defaultRate: "1.2%",
-        pendingVerifications: pendingStudents.length
-    };
-
-    if (document.getElementById("total-liquidity")) {
-        document.getElementById("total-liquidity").innerText = metrics.totalLiquidity;
-        document.getElementById("active-loans").innerText = metrics.activeLoans;
-        document.getElementById("default-rate").innerText = metrics.defaultRate;
-        document.getElementById("pending-count").innerText = metrics.pendingVerifications;
-    }
-}
-
-function renderVerificationQueue() {
-    const queueTable = document.getElementById("verification-queue");
-    if (!queueTable) return;
-
-    queueTable.innerHTML = "";
-
-    if (pendingStudents.length === 0) {
-        queueTable.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-gray-400 italic">No pending verifications remaining.</td></tr>`;
+        window.location.href = "p2p.html";
         return;
     }
 
-    pendingStudents.forEach(student => {
-        const row = document.createElement("tr");
-        row.className = "border-b border-gray-200 hover:bg-gray-50 text-sm";
-
-        row.innerHTML = `
-            <td class="p-4 font-medium text-gray-900">${student.id}</td>
-            <td class="p-4 text-gray-700">${student.name}</td>
-            <td class="p-4 text-gray-600"><span class="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs font-semibold">${student.milestone}</span></td>
-            <td class="p-4 text-gray-700">${student.requestedTier}</td>
-            <td class="p-4">
-                <button class="text-indigo-600 hover:underline font-medium text-xs view-doc-btn"><i class="fa-solid fa-file-pdf mr-1"></i> ${student.document}</button>
-            </td>
-            <td class="p-4 flex gap-2">
-                <button class="approve-btn bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-xs font-semibold shadow-sm transition">Approve & Upgrade</button>
-                <button class="reject-btn bg-rose-500 hover:bg-rose-600 text-white px-3 py-1 rounded text-xs font-semibold shadow-sm transition">Reject</button>
-            </td>
-        `;
-
-        row.querySelector(".approve-btn").addEventListener("click", () => verifyMilestone(student.id, true));
-        row.querySelector(".reject-btn").addEventListener("click", () => verifyMilestone(student.id, false));
-        row.querySelector(".view-doc-btn").addEventListener("click", () => alert(`Viewing document: ${student.document}`));
-
-        queueTable.appendChild(row);
-    });
+    try {
+        const currentUser = JSON.parse(sessionToken);
+        if (!currentUser || currentUser.role !== "admin") {
+            alert("Access Denied: Administrative privileges required.");
+            window.location.href = "p2p.html";
+        }
+    } catch (e) {
+        localStorage.removeItem("edulend_session");
+        window.location.href = "p2p.html";
+    }
 }
 
-function verifyMilestone(studentId, isApproved) {
-    if (isApproved) {
-        alert(`Document verified! Student ${studentId} has been upgraded to their next borrowing tier.`);
-    } else {
-        const reason = prompt("Enter reason for document rejection:");
-        if (reason === null) return;
-        if (reason.trim() === "") {
-            alert("Action cancelled: A valid rejection reason is required.");
+// 2. Fetch Aggregates from database via your php API
+function fetchLiveAdminMetrics() {
+
+    fetch("Api/get_admin_dashboard.php")
+        .then(res => res.json())
+        .then(data => {
+
+            if (!data.success) return;
+            document.getElementById("total-liquidity").innerText = "₦" + Number(data.total_liquidity).toLocaleString(undefined, {
+                minimumFractionDigits: 2
+            });
+            document.getElementById("active-loans").innerText = "₦" + Number(data.active_loan_volume).toLocaleString(undefined, {
+                minimumFractionDigits: 2
+            });
+            document.getElementById("default-rate").innerText = data.default_ratio + "%";
+            document.getElementById("pending-count").innerText = data.pending_verifications;
+            document.getElementById("current-date").innerText =
+                new Date().toLocaleDateString();
+        })
+        .catch(error => console.log(error));
+
+}
+
+// 3. Render student rows dynamically straight from MySQL tables
+function fetchLiveVerificationQueue() {
+
+    fetch("Api/get_pending_queue.php")
+        .then(res => res.json())
+        .then(data => {
+            const table = document.getElementById("verification-queue");
+            table.innerHTML = "";
+            if (!data.success || data.students.length === 0) {
+                table.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center p-6">
+                        No Pending Verification Requests
+                    </td>
+                </tr>
+                `;
+                return;
+            }
+            data.students.forEach(student => {
+                table.innerHTML += `
+                <tr>
+                    <td class="p-4">${student.fullname}</td>
+                    <td class="p-4">${student.matric_no}</td>
+                    <td class="p-4">${student.current_tier}</td>
+                    <td class="p-4">${student.requested_tier}</td>
+                    <td class="p-4">
+                        <a href="${student.document_path}" target="_blank"
+                        class="text-blue-600 underline">
+                        View
+                        </a>
+                    </td>
+                    <td class="p-4">
+                        ${student.submitted_at}
+                    </td>
+                    <td class="p-4">
+                        ${student.status}
+                    </td>
+                    <td class="p-4">
+                        <button
+                        onclick="processVerification(${student.verification_id},'approve')"
+                        class="bg-green-600 text-white px-3 py-1 rounded">
+                        Approve
+                          </button>
+                        <button
+                        onclick="processVerification(${student.verification_id},'reject')"
+                        class="bg-red-600 text-white px-3 py-1 rounded ml-2">
+                        Reject
+                        </button>
+                    </td>
+                </tr>
+                `;
+            });
+        });
+}
+
+// Fetch the list of users waiting for approval from backend (id_pending or crf_pending status)
+fetch('Api/get_pending_queue.php')
+    .then(response => response.json())
+    .then(data => {
+        queueTable.innerHTML = "";
+
+        if (!data.success || data.students.length === 0) {
+            queueTable.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-gray-400 italic">No pending milestone verifications remaining.</td></tr>`;
             return;
         }
-        alert(`Document rejected. Notification sent to student: "${reason}"`);
-    }
 
-    pendingStudents = pendingStudents.filter(student => student.id !== studentId);
+        data.students.forEach(student => {
+            const row = document.createElement("tr");
+            row.className = "border-b border-gray-200 hover:bg-gray-50 text-sm";
 
-    renderVerificationQueue();
-    renderMetrics();
+            const isCrf = student.crf_status === 'crf_pending';
+            const levelLabel = isCrf ? "Tier 3: CRF Evaluation" : "Tier 2: ID Validation";
+            const labelStyle = isCrf ? "bg-indigo-100 text-indigo-800" : "bg-amber-100 text-amber-800";
+            const documentName = isCrf ? "student_crf_form.pdf" : "student_id_card.jpg";
+            const actionParam = isCrf ? "approve_tier3" : "approve_tier2";
+
+            row.innerHTML = `
+
+                <td class="p-4 font-semibold">${student.name}</td>
+
+                <td class="p-4 font-mono">${student.matric_no}</td>
+
+                <td class="p-4">
+                Tier ${student.current_tier}
+                </td>
+
+                <td class="p-4">
+                Tier ${student.requested_tier}
+                </td>
+
+                <td class="p-4">
+
+                <a href="${student.document_path}"
+
+                target="_blank"
+
+                class="text-blue-600 underline">
+
+                View
+
+                </a>
+
+                </td>
+
+                <td class="p-4">
+
+                ${student.submitted_at}
+
+                </td>
+
+                <td class="p-4">
+
+                <button
+
+                onclick="processVerification(${student.id},'approve')"
+
+                class="bg-green-600 text-white px-3 py-1 rounded">
+
+                Approve
+
+                </button>
+
+                <button
+
+                onclick="processVerification(${student.id},'reject')"
+
+                class="bg-red-600 text-white px-3 py-1 rounded ml-2">
+
+                Reject
+
+                </button>
+
+                </td>
+
+                `;
+            queueTable.appendChild(row);
+        });
+    })
+    .catch(error => {
+        console.error("Queue rendering error:", error);
+        queueTable.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-rose-500 italic">Database Sync Error: Ensure your local server is active.</td></tr>`;
+    });
+
+
+// Cards 
+function fetchRecentLoans() {
+
+    fetch("Api/get_admin_dashboard.php?action=loans")
+        .then(res => res.json())
+        .then(data => {
+            const table = document.getElementById("loan-activities");
+            table.innerHTML = "";
+            data.loans.forEach(loan => {
+                table.innerHTML += `
+                <tr>
+                <td class="p-4">${loan.id}</td>
+                <td class="p-4">${loan.borrower}</td>
+                <td class="p-4">${loan.lender}</td>
+                <td class="p-4">₦${loan.amount}</td>
+                <td class="p-4">${loan.due_date}</td>
+                <td class="p-4">${loan.status}</td>
+                </tr>
+                `;
+            });
+        });
 }
 
+function fetchRecentTransactions() {
+
+    fetch("Api/get_admin_dashboard.php?action=transactions")
+        .then(res => res.json())
+        .then(data => {
+            const table = document.getElementById("recent-transactions");
+            table.innerHTML = "";
+            data.transactions.forEach(transaction => {
+                table.innerHTML += `
+                <tr>
+                <td class="p-4">${transaction.id}</td>
+                <td class="p-4">${transaction.user}</td>
+                <td class="p-4">${transaction.type}</td>
+                <td class="p-4">₦${transaction.amount}</td>
+                <td class="p-4">${transaction.created_at}</td>
+                <td class="p-4">${transaction.status}</td>
+                </tr>
+                `;
+            });
+        });
+}
+
+function fetchHighRiskBorrowers() {
+
+    fetch("Api/get_admin_dashboard.php?action=risk")
+        .then(res => res.json())
+        .then(data => {
+            const table = document.getElementById("high-risk-users");
+            table.innerHTML = "";
+            data.borrowers.forEach(user => {
+                table.innerHTML += `
+                <tr>
+                <td class="p-4">${user.fullname}</td>
+                <td class="p-4">${user.credit_score}</td>
+                <td class="p-4">₦${user.loan_amount}</td>
+                <td class="p-4">
+                    <span class="text-red-600 font-bold">
+                    ${user.status}
+                    </span>
+                </td>
+                </tr>
+                `;
+            });
+        });
+}
+
+// 4. Governance Action Router to change Student verification statuses
+function processVerification(targetStudentId, operationalAction) {
+    let rejectionReason = "";
+    if (operationalAction === "reject") {
+        rejectionReason = prompt("Please enter the reason for rejecting this document:");
+        if (rejectionReason === null) return; // User cancelled prompt
+        if (rejectionReason.trim() === "") {
+            alert("Action cancelled: Rejection requires a valid reason feedback message.");
+            return;
+        }
+    }
+
+    fetch('Api/verify_user.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `user_id=${encodeURIComponent(targetStudentId)}&action=${encodeURIComponent(operationalAction)}&reason=${encodeURIComponent(rejectionReason)}`
+    })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            if (data.success) {
+                // Reload layout to display fresh database states
+                fetchLiveAdminMetrics();
+                fetchLiveVerificationQueue();
+            }
+        })
+        .catch(error => console.error("Critical governance operation failure:", error));
+}
+
+// 5. System Log Rendering
 function renderSystemLogs() {
     const logContainer = document.getElementById("system-logs");
     if (!logContainer) return;
 
     const logs = [
-        "[INFO] System verified Escrow matching protocols.",
-        "[CRITICAL] Student STU091 missed repayment date. Account locked to DEFAULT state.",
-        "[INFO] New Admission Letter upload detected from User STU114."
+
+        "[INFO] Admin authenticated successfully.",
+        "[INFO] Investment pool synchronized.",
+        "[INFO] Loan monitoring service online.",
+        "[INFO] Transaction ledger synchronized.",
+        "[INFO] Verification engine active.",
+        "[INFO] Risk assessment engine active.",
+        "[INFO] EduLend platform operational."
     ];
+
     logContainer.innerHTML = logs.map(log => `<p class="font-mono text-xs text-emerald-400 my-1 opacity-90">${log}</p>`).join("");
 }
