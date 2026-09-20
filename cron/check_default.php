@@ -25,6 +25,16 @@ try {
         $update_loan = $conn->prepare("UPDATE loans SET status = 'defaulted' WHERE id = ?");
         $update_loan->bind_param("i", $loan_id);
         $update_loan->execute();
+
+                // Preserve pool exposure when a funded loan defaults.
+                $update_allocations = $conn->prepare(
+                        "UPDATE pool_loan_allocations
+                         SET status = 'defaulted'
+                         WHERE loan_id = ?
+                             AND status IN ('allocated', 'partially_repaid')"
+                );
+                $update_allocations->bind_param("i", $loan_id);
+                $update_allocations->execute();
         
         // Flag the user's wallet state as defaulted (This instantly triggers the 80% score drop)
         $update_wallet = $conn->prepare("UPDATE wallets SET is_defaulted = 1 WHERE user_id = ?");

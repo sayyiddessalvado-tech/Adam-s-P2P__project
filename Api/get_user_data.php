@@ -15,9 +15,10 @@ $user_id = $_SESSION['user_id'];
 try {
     // Query both the user profile and wallet metadata simultaneously
     $stmt = $conn->prepare("
-        SELECT u.fullname, u.email, u.role, w.balance, w.debt, w.is_defaulted, w.credit_score 
-        FROM users u 
-        LEFT JOIN wallets w ON u.id = w.user_id 
+         SELECT u.fullname, u.email, u.role, w.balance, w.debt, w.is_defaulted, w.credit_score,
+             w.trust_tier, w.crf_status
+         FROM users u
+         LEFT JOIN wallets w ON u.id = w.user_id
         WHERE u.id = ?
     ");
     $stmt->bind_param("i", $user_id);
@@ -38,7 +39,9 @@ try {
             'balance'      => floatval($userData['balance']),
             'debt'         => floatval($userData['debt']),
             'is_defaulted' => intval($userData['is_defaulted']),
-            'credit_score' => intval($userData['credit_score'] ?? 80)
+            'credit_score' => intval($userData['credit_score'] ?? 80),
+            'trust_tier'   => intval($userData['trust_tier'] ?? 1),
+            'crf_status'   => $userData['crf_status'] ?? 'unsubmitted'
         ]
     ]);
 

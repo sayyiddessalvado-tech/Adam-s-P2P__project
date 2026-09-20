@@ -1,364 +1,458 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script>
-        // INSTANT SECURITY CHECK: Run this before any HTML or CSS renders
-        const session = localStorage.getItem("edulend_session");
-        if (!session) {
-            alert("Access Denied: Administrative privileges required.");
-            window.location.href = "p2p.html"; // Immediate boot back to login
-        } else {
-            const user = JSON.parse(session);
-            if (user.role !== "admin") {
-                alert("Access Denied: Administrative privileges required.");
+        // Verify the authenticated user through the server-side PHP session
+        fetch("/EduLend/Api/get_user_data.php")
+            .then(response => response.json())
+            .then(result => {
+
+                if (!result.success) {
+                    alert("Access Denied: Administrative privileges required.");
+                    window.location.href = "p2p.html";
+                    return;
+                }
+
+                const user = result.data;
+
+                if (user.role !== "admin") {
+                    alert("Access Denied: Administrative privileges required.");
+                    window.location.href = "p2p.html";
+                    return;
+                }
+
+                // Admin session is valid
+                console.log("Administrative authentication verified.");
+
+            })
+            .catch(error => {
+                console.error("Authentication verification failed:", error);
+                alert("Unable to verify administrative access.");
                 window.location.href = "p2p.html";
-            }
-        }
+            });
     </script>
     <title>EduLend Admin Portal - Security & Governance</title>
     <script src="assets/js/tailwind.js"></script>
     <link rel="stylesheet" href="assets/p2p.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        @keyframes pulseGlow {
+
+            0%,
+            100% {
+                opacity: 0.3;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.6;
+                transform: scale(1.05);
+            }
+        }
+
+        .animate-pulse-glow {
+            animation: pulseGlow 4s ease-in-out infinite;
+        }
+    </style>
 </head>
 
-<body class="bg-gray-100 font-sans min-h-screen flex">
+<body
+    class="bg-slate-950 font-sans min-h-screen flex text-slate-100 antialiased selection:bg-emerald-500 selection:text-white">
 
-    <aside class="w-64 bg-slate-900 text-white flex flex-col justify-between hidden md:flex">
+    <!-- Ambient Glow Background -->
+    <div
+        class="fixed top-0 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -z-10 animate-pulse-glow">
+    </div>
+    <div class="fixed bottom-10 left-10 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none -z-10 animate-pulse-glow"
+        style="animation-delay: 2s;"></div>
+
+    <!-- Sidebar Navigation -->
+    <aside
+        class="w-64 bg-slate-900/90 backdrop-blur-xl flex flex-col justify-between hidden md:flex shrink-0 border-r border-slate-800/80 sticky top-0 h-screen z-40">
         <div>
-            <div class="p-6 border-b border-slate-800 flex items-center gap-3">
-                <i class="fa-solid fa-graduation-cap text-emerald-400 text-2xl"></i>
-                <span class="text-xl font-bold tracking-wider text-emerald-400">EduLend Portal</span>
+            <div class="p-6 border-b border-slate-800/80 flex items-center gap-3">
+                <div
+                    class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                    <i class="fa-solid fa-graduation-cap text-slate-950 text-xl"></i>
+                </div>
+                <div>
+                    <span
+                        class="text-lg font-black tracking-wider bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent block">EduLend</span>
+                    <span class="text-[10px] text-slate-400 font-mono tracking-widest uppercase block -mt-1">Gov
+                        Console</span>
+                </div>
             </div>
 
-            <nav class="mt-6 px-4 space-y-2">
-                <a href="#dashboard"
-                    class="flex items-center gap-3 px-4 py-3 bg-emerald-600 rounded-lg text-white font-medium transition">
+            <nav class="mt-6 px-4 space-y-1.5">
+                <a href="#dashboard" onclick="switchAdminTab('tab-overview', this)"
+                    class="tab-nav-btn flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-sm rounded-2xl shadow-lg shadow-emerald-600/20 transition-all">
                     <i class="fa-solid fa-chart-pie w-5"></i> Dashboard Overview
                 </a>
                 <a href="#"
-                    class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition">
+                    class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/80 hover:text-white rounded-2xl transition-all font-semibold text-sm">
                     <i class="fa-solid fa-users w-5"></i> User
                 </a>
-                <a href="#verification-request"
-                    class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition">
-                    <i class="fa-solid fa-user-check w-5"></i> Verfication Request
+                <a href="#verification-request" onclick="switchAdminTab('tab-verifications', this)"
+                    class="tab-nav-btn flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/80 hover:text-white rounded-2xl transition-all font-semibold text-sm">
+                    <i class="fa-solid fa-user-check w-5"></i> Verification Request
                 </a>
-                <a href="#investment-pool"
-                    class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition">
+                <a href="#investment-pool" onclick="switchAdminTab('tab-overview', this)"
+                    class="tab-nav-btn flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/80 hover:text-white rounded-2xl transition-all font-semibold text-sm">
                     <i class="fa-solid fa-hand-holding-dollar w-5"></i> Investment Pool
                 </a>
-                <a href="#loan-monitoring"
-                    class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition">
+                <a href="#loan-monitoring" onclick="switchAdminTab('tab-loans', this)"
+                    class="tab-nav-btn flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/80 hover:text-white rounded-2xl transition-all font-semibold text-sm">
                     <i class="fa-solid fa-shield-halved w-5"></i> Loan Monitoring
                 </a>
-                <a href="#transactions"
-                    class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition">
+                <a href="#transactions" onclick="switchAdminTab('tab-loans', this)"
+                    class="tab-nav-btn flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/80 hover:text-white rounded-2xl transition-all font-semibold text-sm">
                     <i class="fa-solid fa-money-bill-transfer w-5"></i> Transactions
                 </a>
-                <a href="#reports"
-                    class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition">
+                <a href="#reports" onclick="switchAdminTab('tab-reports', this)"
+                    class="tab-nav-btn flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/80 hover:text-white rounded-2xl transition-all font-semibold text-sm">
                     <i class="fa-solid fa-file-lines w-5"></i> Reports
                 </a>
-                <a href="#system-logs"
-                    class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition">
+                <a href="#system-logs" onclick="switchAdminTab('tab-risk', this)"
+                    class="tab-nav-btn flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/80 hover:text-white rounded-2xl transition-all font-semibold text-sm">
                     <i class="fa-solid fa-clipboard-flip w-5"></i> System Logs
                 </a>
-                <a href="#settings"
-                    class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition">
+                <a href="#settings" onclick="switchAdminTab('tab-reports', this)"
+                    class="tab-nav-btn flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/80 hover:text-white rounded-2xl transition-all font-semibold text-sm">
                     <i class="fa-solid fa-gears w-5"></i> Settings
                 </a>
             </nav>
         </div>
 
-        <div class="p-4 border-t border-slate-800">
-            <div class="flex items-center gap-3 mb-3">
+        <div class="p-4 border-t border-slate-800/80 bg-slate-950/60">
+            <div class="flex items-center gap-3 mb-3 p-2 bg-slate-800/40 rounded-2xl border border-slate-800">
                 <div
-                    class="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center font-bold text-slate-900">
+                    class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center font-black text-slate-950 shadow-md">
                     AD
                 </div>
-                <div>
-                    <p class="text-sm font-semibold">System Administrator</p>
-                    <span class="text-xs text-emerald-400 font-mono">Root Access</span>
+                <div class="min-w-0">
+                    <p class="text-xs font-extrabold text-white truncate">System Administrator</p>
+                    <span class="text-[10px] text-emerald-400 font-mono font-bold tracking-wider">Root Access</span>
                 </div>
             </div>
             <button onclick="localStorage.removeItem('edulend_session'); window.location.href='p2p.html';"
-                class="w-full text-left flex items-center gap-3 px-4 py-2 text-rose-400 hover:bg-slate-800 rounded-lg transition text-sm">
-                <i class="fa-solid fa-right-from-bracket"></i> Clear Session / Exit
+                class="w-full text-left flex items-center gap-3 px-4 py-2.5 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 rounded-xl transition-all text-xs font-bold group">
+                <i class="fa-solid fa-right-from-bracket transition-transform group-hover:-translate-x-0.5"></i> Clear
+                Session / Exit
             </button>
         </div>
     </aside>
 
-    <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+    <!-- Main Content Workspace -->
+    <main class="flex-1 flex flex-col min-w-0 overflow-y-auto bg-slate-900/40">
 
-        <header class="bg-white shadow-sm border-b border-gray-200 px-8 py-4 flex items-center justify-between">
+        <!-- Header Bar -->
+        <header
+            class="bg-slate-900/80 backdrop-blur-md sticky top-0 z-30 border-b border-slate-800/80 px-6 sm:px-8 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-                <h1 class="text-2xl font-bold text-gray-800">EduLend Administration Portal</h1>
-                <p class="text-sm text-gray-500">System Control & Monitoring</p>
+                <h1 class="text-xl sm:text-2xl font-black text-white tracking-tight">EduLend Administration Portal</h1>
+                <p class="text-xs sm:text-sm text-slate-400 font-medium">System Control & Governance Console</p>
             </div>
-            <div class="flex items-center gap-4">
+            <div class="flex flex-wrap items-center gap-3">
                 <span
-                    class="bg-emerald-100 text-emerald-800 text-xs px-3 py-1 rounded-full font-semibold border border-emerald-200">
-                    <i class="fa-solid fa-circle-check mr-1"></i> Live Database Node Connected
+                    class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs px-3.5 py-1.5 rounded-full font-bold flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    <i class="fa-solid fa-circle-check text-emerald-400"></i> Live Database Node Connected
                 </span>
-                <span class="text-sm text-gray-600 font-medium font-mono" id="current-date"><span
-                        id="current-date"></span>
+                <span
+                    class="text-xs sm:text-sm text-slate-300 font-bold font-mono bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700/60"
+                    id="current-date"><span id="current-date"></span>
             </div>
         </header>
 
-        <div id="dashboard" class="p-8 space-y-8">
+        <div id="dashboard" class="p-4 sm:p-6 md:p-8 space-y-8">
 
-            <section id="investment-pool" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <!-- High Level Metric Cards -->
+            <section id="investment-pool" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 <div
-                    class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between min-w-0">
-                    <div class="min-w-0 flex-1 pr-2">
-                        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">Investment Pool
-                            Balance</p>
-                        <h3 class="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 mt-1 break-all tracking-tight"
-                            id="total-liquidity">₦ 0.00</h3>
-                    </div>
-                    <div
-                        class="w-12 h-12 rounded-full bg-emerald-50 flex-shrink-0 flex items-center justify-center text-emerald-600 text-xl">
-                        <i class="fa-solid fa-wallet"></i>
-                    </div>
+                    class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl relative overflow-hidden group shadow-xl hover:border-emerald-500/40 transition-all">
+                    <p class="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Investment Pool
+                        Balance</p>
+                    <h3 class="text-2xl sm:text-3xl font-black text-emerald-400 mt-2 break-all tracking-tight"
+                        id="total-liquidity">₦ 0.00</h3>
                 </div>
 
                 <div
-                    class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between min-w-0">
-                    <div class="min-w-0 flex-1 pr-2">
-                        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">Outstanding
-                            Loans</p>
-                        <h3 class="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 mt-1 break-all tracking-tight"
-                            id="active-loans">₦0.00</h3>
-                    </div>
-                    <div
-                        class="w-12 h-12 rounded-full bg-indigo-50 flex-shrink-0 flex items-center justify-center text-indigo-600 text-xl">
-                        <i class="fa-solid fa-money-bill-trend-up"></i>
-                    </div>
+                    class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl relative overflow-hidden group shadow-xl hover:border-indigo-500/40 transition-all">
+                    <p class="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Outstanding Loans</p>
+                    <h3 class="text-2xl sm:text-3xl font-black text-indigo-400 mt-2 break-all tracking-tight"
+                        id="active-loans">₦0.00</h3>
                 </div>
 
                 <div
-                    class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between min-w-0">
-                    <div class="min-w-0 flex-1 pr-2">
-                        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">Defaulter
-                            Loans</p>
-                        <h3 class="text-lg sm:text-xl lg:text-2xl font-bold text-rose-600 mt-1 break-all tracking-tight"
-                            id="default-rate">0.0%</h3>
-                    </div>
-                    <div>
-                        class="w-12 h-12 rounded-full bg-rose-50 flex-shrink-0 flex items-center justify-center
-                        text-rose-600 text-xl">
-                        <i class="fa-solid fa-triangle-exclamation"></i>
-                    </div>
+                    class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl relative overflow-hidden group shadow-xl hover:border-rose-500/40 transition-all">
+                    <p class="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Defaulter Loans</p>
+                    <h3 class="text-2xl sm:text-3xl font-black text-rose-500 mt-2 break-all tracking-tight"
+                        id="default-rate">0.0%</h3>
                 </div>
 
                 <div
-                    class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between min-w-0">
-                    <div class="min-w-0 flex-1 pr-2">
-                        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">Pending
-                            Requests</p>
-                        <h3 class="text-lg sm:text-xl lg:text-2xl font-bold text-amber-600 mt-1 break-all tracking-tight"
-                            id="pending-count">0</h3>
-                    </div>
-                    <div
-                        class="w-12 h-12 rounded-full bg-amber-50 flex-shrink-0 flex items-center justify-center text-amber-600 text-xl">
-                        <i class="fa-solid fa-user-clock"></i>
-                    </div>
+                    class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl relative overflow-hidden group shadow-xl hover:border-amber-500/40 transition-all">
+                    <p class="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Pending Requests</p>
+                    <h3 class="text-2xl sm:text-3xl font-black text-amber-400 mt-2 break-all tracking-tight"
+                        id="pending-count">0</h3>
                 </div>
             </section>
 
+            <!-- Console Tab Switches Header -->
+            <div class="flex items-center gap-2 border-b border-slate-800 overflow-x-auto pb-2">
+                <button onclick="switchAdminTab('tab-overview', this)"
+                    class="admin-tab-btn active px-5 py-2.5 rounded-xl font-bold text-xs bg-slate-800 text-white border border-slate-700 transition-all flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-chart-pie"></i> Metrics & Overview
+                </button>
+                <button onclick="switchAdminTab('tab-verifications', this)"
+                    class="admin-tab-btn px-5 py-2.5 rounded-xl font-bold text-xs text-slate-400 hover:text-white transition-all flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-user-check"></i> Verification Queue
+                </button>
+                <button onclick="switchAdminTab('tab-loans', this)"
+                    class="admin-tab-btn px-5 py-2.5 rounded-xl font-bold text-xs text-slate-400 hover:text-white transition-all flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-money-bill-transfer"></i> Loans & Transactions
+                </button>
+                <button onclick="switchAdminTab('tab-risk', this)"
+                    class="admin-tab-btn px-5 py-2.5 rounded-xl font-bold text-xs text-slate-400 hover:text-white transition-all flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-shield-cat"></i> Risk & Audit Logs
+                </button>
+                <button onclick="switchAdminTab('tab-reports', this)"
+                    class="admin-tab-btn px-5 py-2.5 rounded-xl font-bold text-xs text-slate-400 hover:text-white transition-all flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-file-lines"></i> Reports & Settings
+                </button>
+            </div>
 
-            <section id="verification-request"
-                class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div class="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-                    <div>
-                        <h2 class="text-lg font-bold text-gray-800">Academic Milestone Verification Queue</h2>
-                        <p class="text-xs text-gray-500">Manual proof auditing system for student tier advancement
-                            algorithms.</p>
-                    </div>
-                    <span class="text-xs bg-indigo-100 text-indigo-800 px-3 py-1 rounded font-mono font-bold">Needs
-                        Manual Sign-off</span>
+            <!-- TAB CONTENT CONTAINER -->
+            <div id="tab-content-wrapper">
+
+                <!-- TAB 1: OVERVIEW & VERIFICATIONS PREVIEW -->
+                <div id="tab-overview" class="tab-pane space-y-8">
+                    <!-- Academic Milestone Verification Queue -->
+                    <section id="verification-request"
+                        class="bg-slate-900/90 rounded-3xl border border-slate-800 overflow-hidden shadow-xl">
+                        <div
+                            class="p-6 border-b border-slate-800/80 bg-slate-900/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                                <h2
+                                    class="text-base font-extrabold text-white tracking-tight flex items-center gap-2.5">
+                                    <span
+                                        class="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-sm shadow-indigo-500"></span>
+                                    Academic Milestone Verification Queue
+                                </h2>
+                                <p class="text-xs text-slate-400 font-medium mt-1">Manual proof auditing system for
+                                    student tier advancement algorithms.</p>
+                            </div>
+                            <span
+                                class="text-[11px] bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 px-3 py-1.5 rounded-full font-mono font-extrabold shrink-0">Needs
+                                Manual Sign-off</span>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr
+                                        class="bg-slate-950/60 border-b border-slate-800 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                                        <th class="p-4 pl-6">Student</th>
+                                        <th class="p-4">Matric Number</th>
+                                        <th class="p-4">Current Tier</th>
+                                        <th class="p-4">Requested Tier</th>
+                                        <th class="p-4">Supporting Document</th>
+                                        <th class="p-4">Submission Date</th>
+                                        <th class="p-4">Status</th>
+                                        <th class="p-4 pr-6 text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="verification-queue" class="divide-y divide-slate-800/60 text-sm">
+                                    <tr>
+                                        <td colspan="8" class="p-8 text-center text-slate-500 italic font-medium">
+                                            <i class="fa-solid fa-spinner animate-spin mr-2 text-indigo-400"></i>
+                                            Querying verification engine ledger...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
                 </div>
 
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr
-                                class="bg-gray-100 border-b border-gray-200 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                                <th class="p-4">Student</th>
-                                <th class="p-4">Matric Number</th>
-                                <th class="p-4">Current Tier</th>
-                                <th class="p-4">Requested Tier</th>
-                                <th class="p-4">Supporting Document</th>
-                                <th class="p-4">Submission Date</th>
-                                <th class="p-4">Status</th>
-                                <th class="p-4 text-center">Action</th>
-
-                            </tr>
-                        </thead>
-                        <tbody id="verification-queue" class="divide-y divide-gray-100 bg-white text-sm">
-                            <tr>
-                                <td colspan="8" class="p-8 text-center text-gray-400 italic"></td>
-                                <i class="fa-solid fa-spinner animate-spin mr-2"></i> Querying verification engine
-                                ledger...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-
-            <!--Loan Activities-->
-            <section id="loan-monitoring" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-
-                <div class="p-6 border-b">
-                    <h2 class="text-lg font-bold">
-                        Recent Loan Activities
-                    </h2>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="bg-gray-100">
-                            <tr>
-                                <th class="p-4">Loan ID</th>
-                                <th class="p-4">Borrower</th>
-                                <th class="p-4">Lender</th>
-                                <th class="p-4">Amount</th>
-                                <th class="p-4">Due Date</th>
-                                <th class="p-4">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="loan-activities">
-                            <tr>
-                                <td colspan="6" class="text-center p-6 text-gray-400">
-                                    Loading loan activities...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!--Recent Transactions-->
-            <section id="transactions" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-
-                <div class="p-6 border-b">
-                    <h2 class="text-lg font-bold">
-                        Recent Transactions
-                    </h2>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="bg-gray-100">
-                            <tr>
-                                <th class="p-4">Transaction ID</th>
-                                <th class="p-4">User</th>
-                                <th class="p-4">Type</th>
-                                <th class="p-4">Amount</th>
-                                <th class="p-4">Date</th>
-                                <th class="p-4">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="recent-transactions">
-                            <tr>
-                                <td colspan="6" class="text-center p-6">
-                                    Loading...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <!-- TAB 2: VERIFICATION QUEUE EXCLUSIVE -->
+                <div id="tab-verifications" class="tab-pane hidden space-y-8">
+                    <!-- Duplicate reference element wrapper for tab isolation keeping original target intact -->
                 </div>
 
-            </section>
+                <!-- TAB 3: LOANS AND TRANSACTIONS -->
+                <div id="tab-loans" class="tab-pane hidden space-y-8">
+                    <!-- Loan Activities Section -->
+                    <section id="loan-monitoring"
+                        class="bg-slate-900/90 rounded-3xl border border-slate-800 overflow-hidden shadow-xl">
+                        <div class="p-6 border-b border-slate-800/80 bg-slate-900/50 flex items-center justify-between">
+                            <h2 class="text-base font-extrabold text-white tracking-tight flex items-center gap-2.5">
+                                <span
+                                    class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500"></span>
+                                Recent Loan Activities
+                            </h2>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead
+                                    class="bg-slate-950/60 border-b border-slate-800 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                                    <tr>
+                                        <th class="p-4 pl-6">Loan ID</th>
+                                        <th class="p-4">Borrower</th>
+                                        <th class="p-4">Funding Source</th>
+                                        <th class="p-4">Amount</th>
+                                        <th class="p-4">Due Date</th>
+                                        <th class="p-4 pr-6">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="loan-activities" class="divide-y divide-slate-800/60 text-sm">
+                                    <tr>
+                                        <td colspan="6" class="text-center p-8 text-slate-500 italic font-medium">
+                                            Loading loan activities...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
 
-            <!--High Risk Borrower-->
-            <section class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div class="p-6 border-b">
-                    <h2 class="text-lg font-bold text-red-600">
-                        High Risk Borrowers
-                    </h2>
+                    <!-- Recent Transactions Section -->
+                    <section id="transactions"
+                        class="bg-slate-900/90 rounded-3xl border border-slate-800 overflow-hidden shadow-xl">
+                        <div class="p-6 border-b border-slate-800/80 bg-slate-900/50 flex items-center justify-between">
+                            <h2 class="text-base font-extrabold text-white tracking-tight flex items-center gap-2.5">
+                                <span class="w-2.5 h-2.5 rounded-full bg-teal-500 shadow-sm shadow-teal-500"></span>
+                                Recent Transactions
+                            </h2>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead
+                                    class="bg-slate-950/60 border-b border-slate-800 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                                    <tr>
+                                        <th class="p-4 pl-6">Transaction ID</th>
+                                        <th class="p-4">User</th>
+                                        <th class="p-4">Type</th>
+                                        <th class="p-4">Amount</th>
+                                        <th class="p-4">Date</th>
+                                        <th class="p-4 pr-6">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-transactions" class="divide-y divide-slate-800/60 text-sm">
+                                    <tr>
+                                        <td colspan="6" class="text-center p-8 text-slate-500 italic font-medium">
+                                            Loading...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="bg-gray-100">
-                            <tr>
-                                <th class="p-4">
-                                    Borrower
-                                </th>
-                                <th class="p-4">
-                                    Credit Score
-                                </th>
-                                <th class="p-4">
-                                    Outstanding Loan
-                                </th>
-                                <th class="p-4">
-                                    Status
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody id="high-risk-users">
-                            <tr>
-                                <td colspan="4" class="text-center p-6">
-                                    No risky borrowers.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
 
-            <!--Reports-->
-            <section id="reports" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 class="text-lg font-bold mb-6">
-                    Reports
-                </h2>
-                <div class="grid md:grid-cols-4 gap-4">
-                    <button class="bg-blue-600 text-white rounded-lg p-4">
-                        Loan Report
-                    </button>
-                    <button class="bg-green-600 text-white rounded-lg p-4">
-                        Investment Report
-                    </button>
-                    <button class="bg-yellow-500 text-white rounded-lg p-4">
-                        Repayment Report
-                    </button>
-                    <button class="bg-red-600 text-white rounded-lg p-4">
-                        Default Report
-                    </button>
-                </div>
-            </section>
+                <!-- TAB 4: RISK MANAGEMENT & AUDIT LOGS -->
+                <div id="tab-risk" class="tab-pane hidden space-y-8">
+                    <!-- High Risk Borrower Section -->
+                    <section class="bg-slate-900/90 rounded-3xl border border-slate-800 overflow-hidden shadow-xl">
+                        <div class="p-6 border-b border-slate-800/80 bg-rose-500/5 flex items-center justify-between">
+                            <h2 class="text-base font-extrabold text-rose-400 tracking-tight flex items-center gap-2.5">
+                                <span class="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500"></span>
+                                High Risk Borrowers
+                            </h2>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead
+                                    class="bg-slate-950/60 border-b border-slate-800 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                                    <tr>
+                                        <th class="p-4 pl-6">Borrower</th>
+                                        <th class="p-4">Credit Score</th>
+                                        <th class="p-4">Outstanding Loan</th>
+                                        <th class="p-4 pr-6">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="high-risk-users" class="divide-y divide-slate-800/60 text-sm">
+                                    <tr>
+                                        <td colspan="4" class="text-center p-8 text-slate-500 italic font-medium">
+                                            No risky borrowers.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
 
-            <!--System Logs INfO-->
-            <section id="system-logs" class="bg-slate-900 rounded-xl shadow-lg border border-slate-950 p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-sm font-bold tracking-wider text-emerald-400 uppercase font-mono">
-                        <i class="fa-solid fa-terminal mr-2"></i> Core Node Infrastructure Audit Logs
-                    </h3>
-                    <div class="flex gap-2">
-                        <span class="w-3 h-3 rounded-full bg-red-500"></span>
-                        <span class="w-3 h-3 rounded-full bg-yellow-500"></span>
-                        <span class="w-3 h-3 rounded-full bg-green-500"></span>
-                    </div>
+                    <!-- System Logs Console -->
+                    <section id="system-logs"
+                        class="bg-slate-950 rounded-3xl border border-slate-800 p-6 shadow-2xl relative overflow-hidden">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3
+                                class="text-xs font-extrabold tracking-wider text-emerald-400 uppercase font-mono flex items-center">
+                                <i class="fa-solid fa-terminal mr-2 text-emerald-500"></i> Core Node Infrastructure
+                                Audit Logs
+                            </h3>
+                            <div class="flex gap-1.5">
+                                <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
+                                <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
+                            </div>
+                        </div>
+                        <div
+                            class="bg-slate-900/90 p-4 rounded-2xl h-44 overflow-y-auto border border-slate-800/80 space-y-1 font-mono text-xs text-slate-300">
+                        </div>
+                    </section>
                 </div>
-                <div class="bg-slate-950 p-4 rounded-lg h-36 overflow-y-auto border border-slate-800 space-y-1">
-                </div>
-            </section>
-                 <!--Settings-->
-            <section id="settings" class="bg-white rounded-xl shadow-sm border p-6">
-                <h2 class="text-lg font-bold mb-4">System Settings</h2>
 
-                <p class="text-gray-500">
-                    Future configuration options for administrators will appear here.
-                </p>
-            </section>
+                <!-- TAB 5: REPORTS & SETTINGS -->
+                <div id="tab-reports" class="tab-pane hidden space-y-8">
+                    <!-- Reports Module -->
+                    <section id="reports" class="bg-slate-900/90 rounded-3xl border border-slate-800 p-6 shadow-xl">
+                        <h2 class="text-base font-extrabold text-white mb-5 tracking-tight flex items-center gap-2.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm shadow-amber-400"></span>
+                            Reports
+                        </h2>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                            <button
+                                class="bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-2xl p-4 text-xs shadow-lg transition-all flex items-center justify-center gap-2">
+                                Loan Report
+                            </button>
+                            <button
+                                class="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-2xl p-4 text-xs shadow-lg transition-all flex items-center justify-center gap-2">
+                                Investment Report
+                            </button>
+                            <button
+                                class="bg-amber-500 hover:bg-amber-400 text-white font-extrabold rounded-2xl p-4 text-xs shadow-lg transition-all flex items-center justify-center gap-2">
+                                Repayment Report
+                            </button>
+                            <button
+                                class="bg-rose-600 hover:bg-rose-500 text-white font-extrabold rounded-2xl p-4 text-xs shadow-lg transition-all flex items-center justify-center gap-2">
+                                Default Report
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Settings Section -->
+                    <section id="settings" class="bg-slate-900/90 rounded-3xl border border-slate-800 p-6 shadow-xl">
+                        <h2 class="text-base font-extrabold text-white mb-2 tracking-tight flex items-center gap-2.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                            System Settings
+                        </h2>
+                        <p class="text-slate-400 font-medium text-xs">
+                            Future configuration options for administrators will appear here.
+                        </p>
+                    </section>
+                </div>
+
+            </div>
 
         </div>
     </main>
 
-    <script src="assets/js/admin_dashboard.js"></script>
+    <script src="assets/js/admin_dashboard.js?v=20260912"></script>
 </body>
 
 </html>

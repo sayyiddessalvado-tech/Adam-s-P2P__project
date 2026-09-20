@@ -1,14 +1,10 @@
 // assets/js/auth.js
 
-// Function to open/close the Login Modal
 function toggleModal(id) {
     const modal = document.getElementById(id);
-    if (modal) {
-        modal.classList.toggle('hidden');
-    }
+    if (modal) modal.classList.toggle('hidden');
 }
 
-// Function to switch between Login and Signup forms
 function switchTab(type) {
     const loginForm = document.getElementById('loginForm');
     const signupForm = document.getElementById('signupForm');
@@ -16,80 +12,127 @@ function switchTab(type) {
     const signupTab = document.getElementById('signupTabBtn');
 
     if (type === 'login') {
-        // Show Login, Hide Signup
         loginForm.classList.remove('hidden');
         signupForm.classList.add('hidden');
-
-        // Update Tab Styles
-        loginTab.className = "w-1/2 pb-3 font-bold text-blue-600 border-b-2 border-blue-600 text-center cursor-pointer";
-        signupTab.className = "w-1/2 pb-3 font-medium text-gray-400 text-center cursor-pointer";
+        loginTab.className = 'w-1/2 pb-3 font-bold text-blue-600 border-b-2 border-blue-600 text-center cursor-pointer';
+        signupTab.className = 'w-1/2 pb-3 font-medium text-gray-400 text-center cursor-pointer';
     } else {
-        // Show Signup, Hide Login
         loginForm.classList.add('hidden');
         signupForm.classList.remove('hidden');
-
-        // Update Tab Styles
-        signupTab.className = "w-1/2 pb-3 font-bold text-blue-600 border-b-2 border-blue-600 text-center cursor-pointer";
-        loginTab.className = "w-1/2 pb-3 font-medium text-gray-400 text-center cursor-pointer";
+        signupTab.className = 'w-1/2 pb-3 font-bold text-blue-600 border-b-2 border-blue-600 text-center cursor-pointer';
+        loginTab.className = 'w-1/2 pb-3 font-medium text-gray-400 text-center cursor-pointer';
     }
 }
 
-// Close modal if user clicks outside of the white box
-window.onclick = function (event) {
-    const modal = document.getElementById('loginModal');
-    if (event.target == modal) {
-        modal.classList.add('hidden');
+function showAuthToast(title, message, isError = false) {
+    const toast = document.getElementById('authToast');
+    if (!toast) return;
+
+    document.getElementById('authToastTitle').textContent = title;
+    document.getElementById('authToastMessage').textContent = message;
+    document.getElementById('authToastIcon').textContent = isError ? '!' : '✓';
+    toast.classList.toggle('is-error', isError);
+    toast.classList.remove('hidden');
+
+    window.clearTimeout(window.authToastTimer);
+    window.authToastTimer = window.setTimeout(() => toast.classList.add('hidden'), 5000);
+}
+
+async function submitAuthForm(form) {
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalText = submitButton.textContent;
+    submitButton.disabled = true;
+    submitButton.textContent = 'Please wait...';
+
+    try {
+        const response = await fetch(form.getAttribute('action'), {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: new FormData(form)
+        });
+
+        // A non-AJAX PHP response may redirect during fetch without navigating the page.
+        if (
+            response.redirected &&
+            response.url !== new URL(form.getAttribute('action'), window.location.href).href
+        ) {
+            window.location.replace(response.url);
+            return;
+        }
+
+        const responseText = await response.text();
+        let data;
+
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            const serverMessage = responseText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            throw new Error(serverMessage || `Server returned HTTP ${response.status}.`);
+        }
+
+        if (!response.ok || !data.success) {
+            showAuthToast('Unable to continue', data.message || 'Please check your details and try again.', true);
+            return;
+        }
+
+        showAuthToast(data.title || 'Success', data.message, false);
+
+        if (data.redirect) {
+            window.setTimeout(() => { window.location.replace(data.redirect); }, 1400);
+        } else if (form.id === 'signupForm') {
+            form.reset();
+            window.setTimeout(() => switchTab('login'), 1400);
+        }
+    } catch (error) {
+        console.error('EduLend authentication error:', error);
+        showAuthToast(
+            'Authentication problem',
+            error.message || 'We could not reach EduLend. Please try again.',
+            true
+        );
+    } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = originalText;
     }
 }
 
-// Inside your login form submission event handler in auth.js
-function handleUserLogin(inputEmail, inputPassword) {
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.password-toggle').forEach(button => {
+        button.addEventListener('click', () => {
+            const input = document.getElementById(button.dataset.target);
+            if (!input) return;
 
-    // 1. SYSTEM ADMINISTRATOR OVERRIDE CHECK
-    if (inputEmail === "admin@edulend.com" && inputPassword === "admin123") {
-        localStorage.setItem("edulend_session", JSON.stringify({
-            id: "ADMIN001",
-            name: "System Administrator",
-            role: "admin"
-        }));
+            const showing = input.type === 'text';
+            input.type = showing ? 'password' : 'text';
+            button.textContent = showing ? '◉' : '○';
+            button.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+        });
+    });
 
-        alert("Administrative authentication successful. Redirecting to Governance Panel...");
-        window.location.href = "admin_dashboard.html"; // Jumps into the admin folder
-        return true; // Return true if handled
-    }
-
-    // 2. STANDARD USER / LENDER CHECK CONTINUES BELOW...
-    return false; // Return false to let standard logic proceed
-}
-
-// ==========================================
-// NEW ADDITION: THE EVENT INTERCEPTOR (THE STOP SIGN)
-// ==========================================
-document.addEventListener("DOMContentLoaded", () => {
-    const loginFormElement = document.getElementById('loginForm');
-
-    if (loginFormElement) {
-        loginFormElement.addEventListener('submit', function (e) {
-
-            // 1. Look up your actual input fields in the HTML
-            // Note: If your HTML inputs have different IDs/names, match them here!
-            const emailInput = loginFormElement.querySelector('input[type="email"]') || document.getElementById('emailInput');
-            const passwordInput = loginFormElement.querySelector('input[type="password"]') || document.getElementById('passwordInput');
-
-            if (emailInput && passwordInput) {
-                const emailValue = emailInput.value.trim();
-                const passwordValue = passwordInput.value;
-
-                // 2. Run your admin override check
-                const isAdmin = handleUserLogin(emailValue, passwordValue);
-
-                // 3. If it's an admin, STOP the form from going to api/auth_handler.php
-                if (isAdmin) {
-                    e.preventDefault();
-                }
-                // If it's NOT an admin, the code drops through, 
-                // e.preventDefault() isn't called, and it submits to the PHP file normally!
-            }
+    const roleInput = document.getElementById('roleInput');
+    const roleHint = document.getElementById('roleHint');
+    if (roleInput && roleHint) {
+        roleInput.addEventListener('change', () => {
+            roleHint.textContent = roleInput.value === 'student'
+                ? 'Request education loans, build your trust profile, and manage repayments.'
+                : roleInput.value === 'lender'
+                    ? 'Fund verified student loans and monitor your investment returns.'
+                    : 'Choose how you will use EduLend.';
         });
     }
-}); 
+
+    document.querySelectorAll('#loginForm, #signupForm').forEach(form => {
+        form.addEventListener('submit', event => {
+            event.preventDefault();
+            submitAuthForm(form);
+        });
+    });
+
+    const toastClose = document.getElementById('authToastClose');
+    if (toastClose) toastClose.addEventListener('click', () => document.getElementById('authToast').classList.add('hidden'));
+
+    window.addEventListener('click', event => {
+        const modal = document.getElementById('loginModal');
+        if (event.target === modal) modal.classList.add('hidden');
+    });
+});

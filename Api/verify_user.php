@@ -1,6 +1,10 @@
  <?php
 header("Content-Type: application/json");
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 require_once("../Includes_dynamics/dataB.php");
 
 try {
@@ -9,12 +13,16 @@ try {
         throw new Exception("Invalid request method.");
     }
 
-    $userId = intval($_POST["user_id"] ?? 0);
+    if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
+        throw new Exception("Unauthorized administrator action.");
+    }
+
+    $verificationId = intval($_POST["verification_id"] ?? 0);
     $action = $_POST["action"] ?? "";
     $reason = trim($_POST["reason"] ?? "");
 
-    if ($userId <= 0) {
-        throw new Exception("Invalid user.");
+    if ($verificationId <= 0) {
+        throw new Exception("Invalid verification.");
     }
 
     if ($action != "approve" && $action != "reject") {
@@ -24,14 +32,15 @@ try {
     $conn->begin_transaction();
 
     // Get pending verification
-    $verification = $conn->query("
-        SELECT *
+    $verificationStmt = $conn->prepare("
+        SELECT id, user_id, verification_type
         FROM verifications
-        WHERE user_id=$userId
-        AND status='pending'
-        ORDER BY submitted_at DESC
-        LIMIT 1
+        WHERE id = ? AND status = 'pending'
+        FOR UPDATE
     ");
+    $verificationStmt->bind_param("i", $verificationId);
+    $verificationStmt->execute();
+    $verification = $verificationStmt->get_result();
 
     if ($verification->num_rows == 0) {
         throw new Exception("No pending verification found.");
@@ -39,17 +48,28 @@ try {
 
     $verificationData = $verification->fetch_assoc();
 
-    $verificationId = $verificationData["id"];
+    $userId = (int) $verificationData["user_id"];
     $verificationType = $verificationData["verification_type"];
+
+    $walletStmt = $conn->prepare("SELECT trust_tier FROM wallets WHERE user_id = ? FOR UPDATE");
+    $walletStmt->bind_param("i", $userId);
+    $walletStmt->execute();
+    $walletData = $walletStmt->get_result()->fetch_assoc();
+
+    if (!$walletData) {
+        throw new Exception("Student wallet not found.");
+    }
+
+    if ($action === "approve" && $verificationType === "course_registration_form" && (int) $walletData["trust_tier"] < 2) {
+        throw new Exception("Student ID verification must be approved before approving the CRF.");
+    }
 
     if ($action == "approve") {
 
         // Update verification
-        $conn->query("
-            UPDATE verifications
-            SET status='approved'
-            WHERE id=$verificationId
-        ");
+        $updateVerification = $conn->prepare("UPDATE verifications SET status = 'approved' WHERE id = ? AND status = 'pending'");
+        $updateVerification->bind_param("i", $verificationId);
+        $updateVerification->execute();
 
         // Update wallet tier
         if ($verificationType == "student_id") {
@@ -57,8 +77,8 @@ try {
             $conn->query("
                 UPDATE wallets
                 SET
-                    trust_tier=2,
-                    crf_status='approved'
+                    trust_tier = GREATEST(trust_tier, 2),
+                    crf_status = CASE WHEN crf_status = 'approved' THEN crf_status ELSE 'unsubmitted' END
                 WHERE user_id=$userId
             ");
 
@@ -67,8 +87,8 @@ try {
             $conn->query("
                 UPDATE wallets
                 SET
-                    trust_tier=3,
-                    crf_status='approved'
+                    trust_tier = GREATEST(trust_tier, 3),
+                    crf_status = 'approved'
                 WHERE user_id=$userId
             ");
 
@@ -82,18 +102,14 @@ try {
     } else {
 
         // Reject verification
-        $conn->query("
-            UPDATE verifications
-            SET status='rejected'
-            WHERE id=$verificationId
-        ");
+        $updateVerification = $conn->prepare("UPDATE verifications SET status = 'rejected' WHERE id = ? AND status = 'pending'");
+        $updateVerification->bind_param("i", $verificationId);
+        $updateVerification->execute();
 
         // Wallet status
-        $conn->query("
-            UPDATE wallets
-            SET crf_status='rejected'
-            WHERE user_id=$userId
-        ");
+        if ($verificationType === "course_registration_form") {
+            $conn->query("UPDATE wallets SET crf_status = 'rejected' WHERE user_id = $userId");
+        }
 
         $title = "Verification Rejected";
 
@@ -122,7 +138,7 @@ try {
     $stmt->execute();
 
     // Admin Log
-    $adminId = 1;
+    $adminId = (int) $_SESSION['user_id'];
 
     $logAction = ucfirst($action) . " Verification";
 

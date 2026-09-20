@@ -1,94 +1,90 @@
  <?php
 // Api/process_transaction.php
-session_start();
-require_once __DIR__ . '/../Includes_dynamics/dataB.php';
- 
-header('Content-Type: application/json');
+// EduLend - Transaction History API
 
-// Guard clause: Ensure user is completely authenticated before executing financial mutations
-if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized access vector.']);
-    exit();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
-$user_id = $_SESSION['user_id'];
-$amount = floatval($_POST['amount'] ?? 0);
-$type = $_POST['type'] ?? ''; // 'deposit' or 'withdrawal'
+header('Content-Type: application/json');
 
-if ($_SESSION['role'] != 'lender') {
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     echo json_encode([
-        "success"=>false,
-        "message"=>"Only lenders can perform this operation."
+        'success' => false,
+        'message' => 'Invalid request method.'
     ]);
     exit();
 }
 
-if ($amount <= 0 || !in_array($type, ['deposit', 'withdrawal'])) {
-    echo json_encode(['success' => false, 'message' => 'Invalid transaction parameters.']);
+if (!isset($_SESSION['user_id'])) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Unauthorized access.'
+    ]);
     exit();
 }
 
-// Open explicit SQL Transaction context to enforce strict database consistency
-$conn->begin_transaction();
+require_once __DIR__ . '/../Includes_dynamics/dataB.php';
+
+$user_id = intval($_SESSION['user_id']);
 
 try {
-    // Implement Pessimistic Row-Level Locking to entirely eliminate race conditions
-    $stmt = $conn->prepare("SELECT balance FROM wallets WHERE user_id = ? FOR UPDATE");
+
+    /*
+     * Retrieve transactions belonging ONLY to
+     * the currently authenticated user.
+     */
+    $stmt = $conn->prepare(
+        "SELECT
+            id,
+            type,
+            amount,
+            reference,
+            created_at
+         FROM transactions
+         WHERE user_id = ?
+         ORDER BY created_at DESC, id DESC"
+    );
+
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
-    $wallet = $stmt->get_result()->fetch_assoc();
 
-    if (!$wallet) {
-        throw new Exception("Target wallet profile could not be localized.");
+    $result = $stmt->get_result();
+
+    $transactions = [];
+
+    while ($row = $result->fetch_assoc()) {
+
+        /*
+         * The database does not contain a status column.
+         * Therefore transaction records successfully stored
+         * in the ledger are treated as completed.
+         */
+        $transactions[] = [
+            'id' => intval($row['id']),
+            'type' => $row['type'],
+            'amount' => $row['amount'],
+            'reference' => $row['reference'] ?? 'N/A',
+            'status' => 'completed',
+            'created_at' => $row['created_at']
+        ];
     }
 
-    $current_balance = floatval($wallet['balance']);
-     
-    if ($type === 'withdrawal') {
-        if ($current_balance < $amount) {
-            echo json_encode(['success' => false, 'message' => 'Insufficient liquidity reserves.']);
-            $conn->rollback();
-            exit();
-        }
-        $new_balance = $current_balance - $amount;
-    } else {
-        // The type is a deposit
-        $new_balance = $current_balance + $amount;
-    }
-
-    // Update the baseline wallet balance
-    $update_stmt = $conn->prepare("UPDATE wallets SET balance = ? WHERE user_id = ?");
-    $update_stmt->bind_param("di", $new_balance, $user_id);
-    $update_stmt->execute();
-    
-    if ($update_stmt->affected_rows < 1) {
-    throw new Exception("Wallet balance update failed.");
-}
-
-    // Log the event securely into the immutable transaction ledger
-    $log_stmt = $conn->prepare("INSERT INTO transactions (user_id, type, amount, status, created_at) VALUES (?, ?, ?, 'completed', NOW())");
-    
-    if (!$log_stmt) {
-    throw new Exception("Unable to create transaction log.");
-}
-    $log_stmt->bind_param("isd", $user_id, $type, $amount);
-    $log_stmt->execute();
-
-
-    $conn->commit();
-
-    // Prepare JSON response data package
-    $response = [
+    echo json_encode([
         'success' => true,
-        'message' => ($type === 'deposit') ? 'Funds successfully credited.' : 'Funds successfully disbursed.',
-        'new_balance' => $new_balance
-    ];
-
-     
-    echo json_encode($response);
+        'transactions' => $transactions
+    ]);
 
 } catch (Exception $e) {
-    $conn->rollback();
-    echo json_encode(['success' => false, 'message' => 'Critical Transaction Execution Failure: ' . $e->getMessage()]);
+
+    error_log(
+        "EduLend Transaction History Error: " .
+        $e->getMessage()
+    );
+
+    echo json_encode([
+        'success' => false,
+        'message' => 'Unable to retrieve transaction history.'
+    ]);
 }
 ?>

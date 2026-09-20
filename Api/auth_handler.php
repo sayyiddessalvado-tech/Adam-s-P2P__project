@@ -7,6 +7,25 @@ session_start();
 // 2. IMPORT DATABASE CONNECTION CONFIG
 require_once '../Includes_dynamics/dataB.php';
 
+$is_ajax = isset($_SERVER['HTTP_X_REQUESTED_WITH'])
+    && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+
+function auth_response(array $payload, int $status = 200): void
+{
+    global $is_ajax;
+
+    if ($is_ajax) {
+        http_response_code($status);
+        header('Content-Type: application/json');
+        echo json_encode($payload);
+        exit();
+    }
+
+    if (!$payload['success']) {
+        die($payload['message']);
+    }
+}
+
 // 3. CAPTURE & SANITIZE POST REQUEST INCOMING VARIABLES
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = isset($_POST['action']) ? trim($_POST['action']) : '';
@@ -22,21 +41,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
          // Guard Clause
         if (empty($fullname) || empty($email) || empty($role) || empty($password)) {
-            die("All fields are required.");
+            auth_response(['success' => false, 'message' => 'All fields are required.'], 422);
         }
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            die("Invalid email address.");
+            auth_response(['success' => false, 'message' => 'Invalid email address.'], 422);
         }
 
         if (strlen($password) < 8) {
-            die("Password must be at least 8 characters.");
+            auth_response(['success' => false, 'message' => 'Password must be at least 8 characters.'], 422);
         }
 
         $allowed_roles = ['student', 'lender'];
 
         if (!in_array($role, $allowed_roles)) {
-            die("Invalid account type.");
+            auth_response(['success' => false, 'message' => 'Invalid account type.'], 422);
         }
     
 
@@ -74,13 +93,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
             // Commit changes if everything works perfectly
             $conn->commit();
-            
-            echo "<script>alert('Account created successfully! Please log in.'); window.location.href='../p2p.html';</script>";
-            exit();
+
+            auth_response([
+                'success' => true,
+                'title' => 'Account created',
+                'message' => 'Your EduLend account is ready. You can now log in.'
+            ]);
 
         } catch (Exception $e) {
             $conn->rollback(); // Revert changes on database failure
-            die("Registration Failed: " . $e->getMessage());
+            auth_response(['success' => false, 'message' => 'Registration failed: ' . $e->getMessage()], 422);
         }
     }
 
@@ -92,15 +114,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $password = $_POST['password'];
 
         if (empty($email) || empty($password)) {
-            die("Email and password are required.");
+            auth_response(['success' => false, 'message' => 'Email and password are required.'], 422);
         }
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            die("Invalid email address.");
+            auth_response(['success' => false, 'message' => 'Invalid email address.'], 422);
         }
 
         if (strlen($password) < 8) {
-            die("Password must be at least 8 characters.");
+            auth_response(['success' => false, 'message' => 'Password must be at least 8 characters.'], 422);
         }
             
         // Query profile from database
@@ -124,26 +146,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              switch ($user['role']) {
 
     case 'student':
-        header("Location: ../dashboard.php");
+        $redirect = '/EduLend/dashboard.php';
         break;
 
     case 'lender':
-        header("Location: ../lender_dashboard.php");
+        $redirect = '/EduLend/lender_dashboard.php';
         break;
 
     case 'admin':
-        header("Location: ../admin_dashboard.php");
+        $redirect = '/EduLend/admin_dashboard.html';
         break;
 
     default:
-        die("Unknown account type.");
+        auth_response(['success' => false, 'message' => 'Unknown account type.'], 422);
 }
 
+if ($is_ajax) {
+    auth_response([
+        'success' => true,
+        'title' => 'Welcome back',
+        'message' => 'Login successful. Opening your dashboard now.',
+        'redirect' => $redirect
+    ]);
+}
+
+header("Location: $redirect");
 exit();
          }  
         }
 
         // Catch-all response for failed authorizations
+        if ($is_ajax) {
+            auth_response(['success' => false, 'message' => 'Invalid email address or secure account password.'], 401);
+        }
+
         echo "<script>alert('Invalid email address or secure account password.'); window.location.href='../p2p.html';</script>";
         exit();
     }

@@ -1,9 +1,11 @@
 <?php
 // lender_dashboard_data.php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-require_once 'Includes_dynamics/dataB.php';
+require_once __DIR__ . '/../Includes_dynamics/dataB.php';
 
 // ============================================================
 // AUTHENTICATION
@@ -136,6 +138,8 @@ $wallet_balance = 0.00;
 $money_invested = 0.00;
 $profit_earned = 0.00;
 $available_withdraw = 0.00;
+$capital_deployed = 0.00;
+$capital_returned = 0.00;
 
 $students_sponsored = 0;
 $recovery_rate = 0;
@@ -246,66 +250,36 @@ try {
 
 
     // ========================================================
-    // MONEY CURRENTLY INVESTED
+    // LENDER POOL POSITION
     // ========================================================
 
-    $inv_stmt = $conn->prepare(
-        "SELECT COALESCE(SUM(amount), 0) AS total
-         FROM loans
-         WHERE lender_id = ?
-         AND status = 'active'"
+    $position_stmt = $conn->prepare(
+        "SELECT
+            COALESCE(SUM(amount), 0) AS contributed,
+            COALESCE(SUM(available_amount), 0) AS available,
+            COALESCE(SUM(deployed_amount), 0) AS deployed,
+            COALESCE(SUM(returned_amount), 0) AS returned,
+            COALESCE(SUM(profit_amount), 0) AS profit
+         FROM lender_pool_contributions
+         WHERE lender_id = ? AND status = 'active'"
     );
+    $position_stmt->bind_param("i", $user_id);
+    $position_stmt->execute();
+    $position = $position_stmt->get_result()->fetch_assoc();
 
-    $inv_stmt->bind_param(
-        "i",
-        $user_id
-    );
-
-    $inv_stmt->execute();
-
-    $money_invested = (float)(
-        $inv_stmt
-            ->get_result()
-            ->fetch_assoc()['total'] ?? 0.00
-    );
-
-
-    // ========================================================
-    // TOTAL PROFIT EARNED
-    // ========================================================
-
-    $prof_stmt = $conn->prepare(
-        "SELECT COALESCE(
-                    SUM(repayment_amount - amount),
-                    0
-                ) AS profit
-         FROM loans
-         WHERE lender_id = ?
-         AND status = 'paid'"
-    );
-
-    $prof_stmt->bind_param(
-        "i",
-        $user_id
-    );
-
-    $prof_stmt->execute();
-
-    $profit_earned = (float)(
-        $prof_stmt
-            ->get_result()
-            ->fetch_assoc()['profit'] ?? 0.00
-    );
+    $wallet_balance = (float)($position['contributed'] ?? $wallet_balance);
+    $available_withdraw = (float)($position['available'] ?? 0.00);
+    $capital_deployed = (float)($position['deployed'] ?? 0.00);
+    $capital_returned = (float)($position['returned'] ?? 0.00);
+    $profit_earned = (float)($position['profit'] ?? 0.00);
+    $money_invested = $capital_deployed;
 
 
     // ========================================================
     // AVAILABLE TO WITHDRAW
     // ========================================================
 
-    $available_withdraw = max(
-        0,
-        $wallet_balance
-    );
+    $available_withdraw = max(0, $available_withdraw);
 
 
     // ========================================================
@@ -313,9 +287,11 @@ try {
     // ========================================================
 
     $stu_stmt = $conn->prepare(
-        "SELECT COUNT(DISTINCT borrower_id) AS cnt
-         FROM loans
-         WHERE lender_id = ?"
+        "SELECT COUNT(DISTINCT l.borrower_id) AS cnt
+         FROM loans l
+         INNER JOIN pool_loan_allocations a ON a.loan_id = l.id
+         INNER JOIN lender_pool_contributions c ON c.id = a.contribution_id
+         WHERE c.lender_id = ?"
     );
 
     $stu_stmt->bind_param(
@@ -349,8 +325,10 @@ try {
                 ),
                 0
             ) AS repaid
-         FROM loans
-         WHERE lender_id = ?"
+         FROM loans l
+         INNER JOIN pool_loan_allocations a ON a.loan_id = l.id
+         INNER JOIN lender_pool_contributions c ON c.id = a.contribution_id
+         WHERE c.lender_id = ?"
     );
 
     $tot_l_stmt->bind_param(
@@ -393,23 +371,22 @@ try {
          )"
     );
 
-    $total_capital = (float)(
-        $tot_cap_stmt
-            ->fetch_assoc()['total'] ?? 0.00
-    );
+    $total_capital = (float)($position['contributed'] ?? 0.00);
 
 
     // ========================================================
     // TOTAL ACTIVE LOANS AND AVERAGE LOAN SIZE
     // ========================================================
-
-    $tot_loans_stmt = $conn->query(
-        "SELECT
-            COUNT(*) AS cnt,
-            COALESCE(AVG(amount), 0) AS avg_amt
-         FROM loans
-         WHERE status = 'active'"
-    );
+ $tot_loans_stmt = $conn->query(
+    "SELECT
+        COUNT(DISTINCT l.id) AS cnt,
+        COALESCE(AVG(l.amount), 0) AS avg_amt
+     FROM loans l
+     INNER JOIN pool_loan_allocations a
+         ON a.loan_id = l.id
+     WHERE l.status IN ('active', 'defaulted')
+       AND a.status IN ('allocated', 'partially_repaid')"
+);
 
     $tot_loans_data = $tot_loans_stmt
         ->fetch_assoc();
@@ -435,10 +412,10 @@ try {
          WHERE u.role = 'lender'"
     );
 
-    $capital_available = (float)(
-        $cap_avail_stmt
-            ->fetch_assoc()['total'] ?? 0.00
+    $pool_stmt = $conn->query(
+        "SELECT available_balance FROM lending_pool WHERE pool_key = 1 LIMIT 1"
     );
+    $capital_available = (float)($pool_stmt->fetch_assoc()['available_balance'] ?? 0.00);
 
 
     // ========================================================
@@ -452,25 +429,23 @@ try {
             l.amount,
             l.repayment_amount,
             l.due_date,
-            l.status
+            l.status,
+            COALESCE(SUM(a.principal_allocated), 0) AS pool_funded_amount,
+            COALESCE(SUM(a.principal_returned), 0) AS principal_returned
          FROM loans l
          INNER JOIN users u
              ON l.borrower_id = u.id
-         WHERE l.lender_id = ?
-         AND l.status IN (
+         INNER JOIN pool_loan_allocations a
+             ON a.loan_id = l.id
+         WHERE l.status IN (
              'pending',
              'approved',
              'active',
              'defaulted'
          )
+         GROUP BY l.id, u.fullname, l.amount, l.repayment_amount, l.due_date, l.status
          ORDER BY l.id DESC"
     );
-
-    $act_stmt->bind_param(
-        "i",
-        $user_id
-    );
-
     $act_stmt->execute();
 
     $active_loans = $act_stmt->get_result();
@@ -484,21 +459,17 @@ try {
         "SELECT
             u.fullname AS borrower,
             l.amount,
-            (l.repayment_amount - l.amount) AS profit,
+            COALESCE(SUM(a.lender_profit), 0) AS profit,
             l.paid_date
          FROM loans l
          INNER JOIN users u
              ON l.borrower_id = u.id
-         WHERE l.lender_id = ?
-         AND l.status = 'paid'
+         INNER JOIN pool_loan_allocations a
+             ON a.loan_id = l.id
+         WHERE l.status = 'paid'
+         GROUP BY l.id, u.fullname, l.amount, l.paid_date
          ORDER BY l.id DESC"
     );
-
-    $hist_stmt->bind_param(
-        "i",
-        $user_id
-    );
-
     $hist_stmt->execute();
 
     $loan_history = $hist_stmt->get_result();

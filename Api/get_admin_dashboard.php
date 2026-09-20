@@ -8,10 +8,12 @@ try {
        DASHBOARD METRICS
     ====================================================== */
 
-    // Current Investment Pool
+    // Authoritative centralized lending pool balance.
     $pool = $conn->query("
-        SELECT IFNULL(SUM(balance),0) AS total_pool
-        FROM wallets
+        SELECT IFNULL(available_balance, 0) AS total_pool
+        FROM lending_pool
+        WHERE pool_key = 1
+        LIMIT 1
     ");
     $poolBalance = $pool->fetch_assoc()['total_pool'];
 
@@ -61,7 +63,7 @@ try {
 
         loans.id,
         borrower.fullname AS borrower,
-        lender.fullname AS lender,
+        COALESCE(lender.fullname, 'EduLend Pool') AS lender,
         loans.amount,
         loans.due_date,
         loans.status

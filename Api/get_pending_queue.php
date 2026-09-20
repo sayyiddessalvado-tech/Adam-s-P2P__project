@@ -7,6 +7,7 @@ try {
 
     $sql = "
         SELECT
+            verifications.id AS verification_id,
             users.id,
             users.fullname,
             users.matric_no,
@@ -52,6 +53,8 @@ try {
         }
 
         $students[] = [
+
+            "verification_id" => (int) $row["verification_id"],
 
             "id" => $row["id"],
 
